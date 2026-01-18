@@ -5,8 +5,9 @@ import org.bson.Document
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.stereotype.Repository
 import java.util.Date
+import com.mongodb.MongoWriteException
 
-// ここも変更なしでOK
+
 data class RegistrationRequest(
     val userId: String,
     val name: String,
@@ -16,20 +17,29 @@ data class RegistrationRequest(
 @Repository
 class FightUserDAO(private val mongoTemplate: MongoTemplate) {
 
-    fun insertUser(request: RegistrationRequest): String {
-        // ここで APIから渡された request.userId (UUID) をセットしています
+          //新規登録処理
+    fun insertUser(request: RegistrationRequest): String? {
         val doc = Document().apply {
-            append(FightUser.Field.USER_ID, request.userId) // ← これがAPIで作ったUUID
+            append(FightUser.Field.USER_ID, request.userId)
             append(FightUser.Field.NAME, request.name)
             append(FightUser.Field.EMAIL, request.email)
             append(FightUser.Field.CREATED_AT, Date())
         }
 
-        // insertOneした瞬間に、docの中に "_id" (ObjectId) が自動で生成されます
-        mongoTemplate.getCollection(FightUser.COLLECTION_NAME).insertOne(doc)
+        return try {
+            // 書き込み実行
+            mongoTemplate.getCollection(FightUser.COLLECTION_NAME).insertOne(doc)
 
-        // 必要であれば _id を返しますが、今回はAPI側でUUIDを持っているので
-        // この戻り値は使わなくても問題ありません
-        return doc.getObjectId(FightUser.Field.ID).toString()
+            // 成功：自動生成された _id (ObjectId) を返す
+            doc.getObjectId("_id").toString()
+
+        } catch (e: MongoWriteException) {
+            // エラーコード 11000 は Unique Index 違反 (重複)
+            if (e.error.code == 11000) {
+                println("--- [ERROR] DUPLICATE USER_ID: ${request.userId} ---")
+                return "DUPLICATE" // または null を返して上位で判定させる
+            }
+            throw e // 重複以外の深刻なエラー（接続切れ等）はそのまま投げる
+        }
     }
 }
