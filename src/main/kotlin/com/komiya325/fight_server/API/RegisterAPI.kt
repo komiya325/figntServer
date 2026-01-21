@@ -9,7 +9,6 @@ import com.komiya325.fight_server.common.Respond
 import com.komiya325.fight_server.constant.ParamKey
 import com.komiya325.fight_server.util.Util
 import org.springframework.stereotype.Service
-import java.util.UUID
 
 @Service
 class RegisterAPI(private val fightUserDAO: FightUserDAO) : IApiAdapter {
@@ -29,24 +28,19 @@ class RegisterAPI(private val fightUserDAO: FightUserDAO) : IApiAdapter {
         }
 
         try {
-            // 3. user_id をサーバー側で生成 (UUID)
-            val newUserId = UUID.randomUUID().toString()
-
-            // 4. リクエストオブジェクト作成
+            // 3. リクエストオブジェクト作成
             val request = RegistrationRequest(
-                userId = newUserId,
                 name = name,
                 email = email
             )
 
-            // 5. DBに保存
-            // ※ここで _id はMongoDB(Document)側で自動生成されて保存されます
-            fightUserDAO.insertUser(request)
+            // 4. DBに保存し、MongoDBが自動生成した_idをuser_idとして取得
+            val userId = fightUserDAO.insertUser(request)
 
-            // 6. レスポンスに user_id を含めて返す
+            // 5. レスポンスに user_id を含めて返す
             val resultData = mapOf(
                 "status" to "success",
-                "user_id" to newUserId
+                "user_id" to userId
             )
             return EntityRespond(resultData)
 
